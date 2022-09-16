@@ -4,19 +4,17 @@ declare(strict_types=1);
 
 namespace Grajewsky\ObjectMapper\Testing;
 
+use Grajewsky\ObjectMapper\Annotations\Required;
+
 class SampleClass
 {
-    public int $id;
+    #[Required(false)]
+    public $id;
 
-    private string $name;
+    public array $names;
 
-    /**
-     * @return string
-     */
-    public function getName(): string
-    {
-        return $this->name;
-    }
+    public object $test;
 
+    public SampleClass $origin;
 
 }
