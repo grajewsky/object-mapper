@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Grajewsky\ObjectMapper;
 
 use Grajewsky\ObjectMapper\Annotations\Required;
-use Grajewsky\ObjectMapper\Exceptions\EmptyRequiredPropertyException;
+use Grajewsky\ObjectMapper\Contracts\Plugins\ValidationPlugin;
+use Grajewsky\ObjectMapper\Exceptions\ValidationException;
 
 class ObjectMapper
 {
     private array $properties = [];
 
-    public function __construct() { }
+    public function __construct(private array $filters) { }
 
     private function cast($value, string $type)
     {
@@ -41,12 +42,13 @@ class ObjectMapper
         return in_array($type, ['string', 'integer', 'float', 'double']);
     }
 
+
     /**
      * @template T
      * @param class-string<T> $resultClass
      * @return T|null
      * @throws \ReflectionException
-     * @throws EmptyRequiredPropertyException
+     * @throws ValidationException
      */
     private function transform(string $resultClass)
     {
@@ -54,29 +56,35 @@ class ObjectMapper
         $object = $refClass->newInstanceWithoutConstructor();
 
         foreach ($refClass->getProperties() as $reflectionProperty) {
-
-            if (AnnotationsHandler::isRequired($reflectionProperty)) {
-                $value = $this->properties[$reflectionProperty->getName()];
-                if (empty($value)) {
-                    throw new EmptyRequiredPropertyException();
-                }
-            }
-            if ($reflectionProperty->getType() === null) {
+            // Handle annotations
+            $handlers = AnnotationsHandler::handler($reflectionProperty, $this->getSourceValue($reflectionProperty), $object, $this->filters);
+            if ($handlers->hasBeenMapped()) {
+                //property has been mapped, nothing to do
+            } elseif ($reflectionProperty->getType() === null) {
                 // Empty type
                 $reflectionProperty->setValue($object, $this->properties[$reflectionProperty->getName()]);
             } elseif ($reflectionProperty->getType()?->isBuiltin() && $this->isPrimitive($reflectionProperty->getType()->getName())) {
                 // handle property primitive type
-                $reflectionProperty->setValue(
-                    $object,
-                    $this->cast(
-                        $this->getSourceValue($reflectionProperty),
-                        $reflectionProperty->getType()->getName()
-                    )
-                );
+                $sourceValue = $this->getSourceValue($reflectionProperty);
+                if (!is_array($sourceValue) && !is_object($sourceValue)) {
+                    $reflectionProperty->setValue(
+                        $object,
+                        $this->cast(
+                            $sourceValue,
+                            $reflectionProperty->getType()->getName()
+                        )
+                    );
+                }
+
             } elseif ($reflectionProperty->getType()->getName() === 'array') {
                 // handle property array type
-                $value = $this->getSourceValue($reflectionProperty);
-                $reflectionProperty->setValue($object, (array) $value);
+                try {
+                    $value = $this->getSourceValue($reflectionProperty);
+                    $reflectionProperty->setValue($object, (array) $value);
+                } catch (\TypeError $error) {
+                    dd($error);
+                }
+
             } elseif ($reflectionProperty->getType()->getName() === 'object') {
                 // handle property object type
                 $value = $this->getSourceValue($reflectionProperty);
@@ -85,12 +93,17 @@ class ObjectMapper
                 // handle property complex type
                 $source = $this->getSourceValue($reflectionProperty);
                 if (is_array($source) || is_object($source)) {
+
                     $ref = ObjectMapper::mapper(
                         $source,
                         $reflectionProperty->getType()->getName()
                     );
                     $reflectionProperty->setValue($object, $ref);
                 }
+            }
+
+            if ($handlers->isValid() === false) {
+                throw new ValidationException("NonSpecified", $reflectionProperty);
             }
         }
 
@@ -100,13 +113,14 @@ class ObjectMapper
     /**
      * @template T
      * @param array|object $source
-     * @param class-string<T> $resultClass
+     * @param class-string $resultClass
+     * @param array $plugins
      * @return T|null
      * @throws \ReflectionException
      */
-    public static function mapper(array|object $source, string $resultClass)
+    public static function mapper(array|object $source, string $resultClass, array $plugins = [])
     {
-        $mapper = new ObjectMapper();
+        $mapper = new ObjectMapper($plugins);
         return $mapper->map($source, $resultClass);
     }
 

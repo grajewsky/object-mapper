@@ -6,14 +6,17 @@ test('map array to class', function() {
 
     $arr = [
         "id" => "A",
-        'names' => 1,
+        'names' => ['test'],
         "test" => ['id' => 1],
         "origin" => [
             "id" => 1
         ]
     ];
 
-    $result = \Grajewsky\ObjectMapper\ObjectMapper::mapper($arr, \Grajewsky\ObjectMapper\Testing\SampleClass::class);
+    $result = \Grajewsky\ObjectMapper\ObjectMapper::mapper(
+        $arr,
+        \Grajewsky\ObjectMapper\Testing\SampleClass::class
+    );
     dd($result);
     $this->assertSame(0, $result->id);
     $this->assertSame($name, $result->getName());

@@ -8,13 +8,12 @@ use Grajewsky\ObjectMapper\Annotations\Required;
 
 class SampleClass
 {
-    #[Required(false)]
+    #[Required]
     public $id;
 
-    public array $names;
+//    #[JsonStringify]
+    public string $names;
 
     public object $test;
-
-    public SampleClass $origin;
 
 }
