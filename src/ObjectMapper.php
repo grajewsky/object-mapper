@@ -39,7 +39,7 @@ class ObjectMapper
 
     private function isPrimitive(string $type): bool
     {
-        return in_array($type, ['string', 'integer', 'float', 'double']);
+        return in_array($type, ['string', 'int', 'integer', 'float', 'double']);
     }
 
 
